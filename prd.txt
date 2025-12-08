@@ -1,0 +1,1074 @@
+Product Requirements Document (PRD)
+Air Quality Guardian - Flutter Mobile Application
+Version: 1.0
+Date: December 05, 2025
+Status: Draft
+
+1. Executive Summary
+Air Quality Guardian is a cross-platform mobile application built with Flutter that provides real-time air quality monitoring, personalized health recommendations, predictive forecasts, and an AI-powered chatbot. The app integrates IoT sensor data, machine learning models, and NLP capabilities to help users make informed decisions about outdoor activities and protect their health.
+
+Key Value Propositions
+Personalized Alerts: Health-condition-aware notifications based on user profiles
+Real-time Visualization: Interactive maps with sensor data and AQI gauges
+Predictive Insights: 24-hour and 7-day air quality forecasts using ML
+Intelligent Assistant: NLP chatbot for health queries and recommendations
+Offline Support: Core functionality available without internet
+2. Business Objectives
+2.1 Primary Goals
+Goal	Target	Timeline
+Reduce user pollution exposure	30% decrease	6 months
+App downloads	10,000+	3 months
+User retention	80% monthly	6 months
+2.2 Success Metrics (KPIs)
+Daily Active Users (DAU): >500
+Alert open rate: >70%
+Average session duration: >3 minutes
+App store rating: ≥4.5 stars
+Crash-free sessions: >99.5%
+3. User Personas
+3.1 Primary: Urban Professional (Age 25-45)
+Name: Sarah, Marketing Manager
+Needs: Quick AQI checks before commute, jogging recommendations
+Pain Points: Limited time, needs glanceable information
+Goals: Minimize exposure during outdoor activities
+
+3.2 Secondary: Elderly with Respiratory Conditions (Age 60+)
+Name: Robert, Retired Teacher
+Needs: Indoor air quality alerts, medication reminders context
+Pain Points: Technology intimidation, health anxiety
+Goals: Stay safe indoors, know when to avoid going out
+
+3.3 Tertiary: Parent with Young Children (Age 30-45)
+Name: Maria, Working Parent
+Needs: School area forecasts, playground safety
+Pain Points: Juggling multiple locations, planning activities
+Goals: Protect children's developing lungs
+
+4. Functional Requirements
+4.1 Authentication Module
+4.1.1 User Registration
+Fields:
+- Full Name (required, 2-50 chars)
+- Email (required, valid format)
+- Password (required, min 8 chars, 1 uppercase, 1 number)
+- Confirm Password
+- Terms acceptance checkbox
+4.1.2 User Login
+Fields:
+- Email
+- Password
+- Remember me checkbox
+- Forgot password link
+4.1.3 Password Recovery
+Flow:
+1. Enter registered email
+2. Receive OTP via email
+3. Enter OTP + new password
+4. Redirect to login
+4.1.4 Data Models
+
+class User {
+  String id;
+  String name;
+  String email;
+  String passwordHash;
+  DateTime createdAt;
+  DateTime updatedAt;
+  bool isVerified;
+  String? fcmToken;
+}
+4.1.5 API Endpoints
+Method	Endpoint	Request Body	Response
+POST	/auth/signup	{name, email, password}	{user, token}
+POST	/auth/login	{email, password}	{user, token, refreshToken}
+POST	/auth/refresh	{refreshToken}	{token, refreshToken}
+POST	/auth/forgot-password	{email}	{message}
+POST	/auth/reset-password	{email, otp, newPassword}	{message}
+POST	/auth/logout	-	{message}
+4.2 Health Profile Module
+4.2.1 Profile Form Fields
+Field	Type	Options	Required
+Age	Number	1-120	Yes
+Gender	Select	Male, Female, Other, Prefer not to say	Yes
+Health Conditions	Multi-select	Asthma, COPD, Heart Disease, Allergies, Diabetes, None	Yes
+Activity Level	Select	Sedentary, Light, Moderate, Active, Very Active	Yes
+Pollution Sensitivity	Slider	1-5 (Low to High)	Yes
+Outdoor Hours/Day	Number	0-24	No
+Notification Preferences	Multi-select	Push, Email, SMS	Yes
+4.2.2 Data Model
+
+class HealthProfile {
+  String id;
+  String userd;
+  int age;
+  String gender;
+  List<String> conditions;
+  String activityLevel;
+  int sensitivity; // 1-5
+  double outdoorHours;
+  NotificationPrefs notificationPrefs;
+  DateTime updatedAt;
+}
+
+class NotificationPrefs {
+  bool push;
+  bool email;
+  bool sms;
+  List<String> alertTypes; // ['severe', 'moderate', 'forecast']
+}
+4.2.3 API Endpoints
+Method	Endpoint	Description
+GET	/user/profile/:userId	Fetch user health profile
+PUT	/user/profile/:userId	Update health profile
+DELETE	/user/profile/:userId	Delete profile (GDPR)
+4.3 Dashboard Module
+4.3.1 Components
+AQI Gauge Card
+
+- Circular gauge showing current AQI (0-500)
+- Color coding: Good(0-50), Moderate(51-100), 
+  Unhealthy-Sensitive(101-150), Unhealthy(151-200),
+  Very Unhealthy(201-300), Hazardous(301-500)
+- Location name and timestamp
+- Tap to see pollutant breakdown
+Risk Assessment Card
+
+- Personalized risk level (Low/Medium/High/Severe)
+- Based on: current AQI + user health profile
+- Icon indicator with color
+- Brief explanation text
+Health Suggestions Card
+
+- 3-5 actionable recommendations
+- Examples:
+  - "Wear N95 mask if going outside"
+  - "Close windows and use air purifier"
+  - "Avoid strenuous outdoor exercise"
+- Personalized based on conditions
+Pollutant Breakdown
+
+- PM2.5, PM10, O3, NO2, SO2, CO levels
+- Bar chart showing each pollutant
+- WHO guideline comparison
+4.3.2 Data Models
+
+class DashboardData {
+  int currentAqi;
+  String aqiCategory;
+  String riskLevel;
+  List<String> suggestions;
+  List<Pollutant> pollutants;
+  SensorLocation location;
+  DateTime timestamp;
+}
+
+class Pollutant {
+  String name;
+  double value;
+  String unit;
+  double whoGuideline;
+  String status; // good, moderate, unhealthy
+}
+
+class SensorLocation {
+  String id;
+  String name;
+  double latitude;
+  double longitude;
+  String address;
+}
+4.3.3 API Endpoints
+Method	Endpoint	Description
+GET	/sensors/realtime	Get all sensors current data
+GET	/sensors/realtime/:id	Get specific sensor data
+GET	/dashboard/:userId	Get personalized dashboard
+4.4 Map Module
+4.4.1 Features
+Map Display
+
+- Google Maps integration
+- User's current location (with permission)
+- All sensor locations as markers
+- Marker color = AQI category color
+- Cluster markers when zoomed out
+Marker Interactions
+
+On tap:
+1. Show info window with:
+   - Location name
+   - Current AQI
+   - Last updated time
+2. "View Details" button
+
+On "View Details":
+- Bottom sheet modal with:
+  - Full pollutant breakdown
+  - 24h mini chart
+  - Health advice for that area
+  - "Get Directions" button
+Map Controls
+
+- Zoom in/out buttons
+- Current location button
+- Layer toggle (satellite/terrain)
+- Filter by AQI range
+4.4.2 Data Model
+
+class Sensor {
+  String id;
+  String name;
+  double latitude;
+  double longitude;
+  String address;
+  int currentAqi;
+  Map<String, double> pollutants;
+  DateTime lastUpdated;
+  bool isOnline;
+}
+
+class SensorHistory {
+  String sensorId;
+  DateTime timestamp;
+  int aqi;
+  Map<String, double> pollutants;
+}
+4.4.3 API Endpoints
+Method	Endpoint	Description
+GET	/sensors	List all sensors with locations
+GET	/sensors/:id	Get sensor details
+GET	/sensors/history/:id	Get 24h/7d history
+GET	/sensors/nearby?lat=&lng=&radius=	Get nearby sensors
+4.5 Forecast Module
+4.5.1 Components
+24-Hour Forecast
+
+- Line chart showing hourly AQI predictions
+- X-axis: Hours (now to +24h)
+- Y-axis: AQI (0-300+)
+- Color zones for AQI categories
+- Tap point for details
+7-Day Forecast
+
+- Bar chart or card list
+- Daily high/low AQI
+- Weather correlation icons
+- Best/worst times highlighted
+NLP Summary
+
+- AI-generated natural language summary
+- Example: "Air quality will be moderate tomorrow 
+  morning but may worsen to unhealthy levels by 
+  evening due to expected traffic congestion. 
+  Consider completing outdoor activities before 2 PM."
+Activity Planner
+
+- Suggested best times for:
+  - Outdoor exercise
+  - Commuting
+  - Children's outdoor play
+- Based on forecast + user profile
+4.5.2 Data Model
+
+class Forecast {
+  String sensorId;
+  List<HourlyForecast> hourly;
+  List<DailyForecast> daily;
+  String nlpSummary;
+  List<ActivitySuggestion> activities;
+  DateTime generatedAt;
+}
+
+class HourlyForecast {
+  DateTime hour;
+  int predictedAqi;
+  double confidence;
+  Map<String, double> pollutants;
+}
+
+class DailyForecast {
+  DateTime date;
+  int highAqi;
+  int lowAqi;
+  String dominantPollutant;
+  String weatherCondition;
+}
+
+class ActivitySuggestion {
+  String activity;
+  DateTime bestStartTime;
+  DateTime bestEndTime;
+  String reason;
+}
+4.5.3 API Endpoints
+Method	Endpoint	Description
+GET	/sensors/forecast/:id	Get forecast for sensor
+GET	/forecast/summary/:userId	Personalized forecast summary
+4.6 Alerts Module
+4.6.1 Alert Types
+Type	Trigger	Severity
+Threshold Alert	AQI exceeds user's sensitivity threshold	Based on AQI
+Spike Alert	Sudden AQI increase (>50 in 1 hour)	High
+Forecast Alert	Predicted unhealthy conditions	Medium
+Recovery Alert	AQI returns to safe levels	Low
+Daily Summary	End of day digest	Info
+4.6.2 Alert Delivery
+Channels:
+- Push notification (FCM)
+- In-app notification bell
+- Email (optional)
+- SMS (premium)
+
+Content:
+- Title: "⚠️ Air Quality Alert"
+- Body: "{Location}: AQI reached {value} ({category}). {recommendation}"
+- Action: Deep link to dashboard/map
+4.6.3 Data Model
+
+class Alert {
+  String id;
+  String userId;
+  String type;
+  String severity; // info, warning, critical
+  String title;
+  String message;
+  String? sensorId;
+  int? aqiValue;
+  DateTime timestamp;
+  bool isRead;
+  String? deepLink;
+}
+4.6.4 API Endpoints
+Method	Endpoint	Description
+GET	/alerts/:userId	Get user's alerts
+PUT	/alerts/:alertId/read	Mark as read
+DELETE	/alerts/:alertId	Delete alert
+PUT	/alerts/settings/:userId	Update alert preferences
+4.7 Chat Module (AI Assistant)
+4.7.1 Features
+Chat Interface
+
+- Message bubbles (user right, bot left)
+- Typing indicator
+- Quick reply suggestions
+- Rich responses (cards, charts)
+- Voice input option
+Capabilities
+
+1. Health Queries
+   - "Is it safe to jog today?"
+   - "What precautions for my asthma?"
+
+2. AQI Explanations
+   - "What does PM2.5 mean?"
+   - "Why is AQI high today?"
+
+3. Recommendations
+   - "Best time to go outside?"
+   - "Should I wear a mask?"
+
+4. Historical Analysis
+   - "How was air quality last week?"
+   - "Compare today vs yesterday"
+
+5. General Information
+   - "What causes air pollution?"
+   - "How can I improve indoor air?"
+4.7.2 Data Model
+
+class ChatMessage {
+  String id;
+  String conversationId;
+  String role; // user, assistant
+  String content;
+  List<QuickReply>? quickReplies;
+  RichContent? richContent;
+  DateTime timestamp;
+}
+
+class QuickReply {
+  String label;
+  String value;
+}
+
+class RichContent {
+  String type; // card, chart, link
+  Map<String, dynamic> data;
+}
+
+class Conversation {
+  String id;
+  String userId;
+  List<ChatMessage> messages;
+  DateTime createdAt;
+  DateTime updatedAt;
+}
+4.7.3 API Endpoints
+Method	Endpoint	Description
+POST	/chat/query	Send message, get response
+GET	/chat/history/:userId	Get chat history
+DELETE	/chat/history/:userId	Clear history
+4.8 Settings Module
+4.8.1 Sections
+Account Settings
+
+Edit name
+Change email
+Change password
+Delete account
+Notification Settings
+
+Push notifications toggle
+Alert types selection
+Quiet hours
+Email preferences
+Display Settings
+
+Theme (Light/Dark/System)
+Language selection
+Units (AQI scale selection)
+Map default view
+Privacy
+
+Location permissions
+Data sharing consent
+Export my data
+Privacy policy link
+About
+
+App version
+Terms of service
+Contact support
+Rate app
+5. Non-Functional Requirements
+5.1 Performance
+Metric	Target
+App launch time	<2 seconds
+Screen transition	<300ms
+API response time	<1 second
+Map load time	<3 seconds
+Offline data access	<500ms
+5.2 Security
+HTTPS for all API calls
+JWT tokens with 1-hour expiry
+Refresh tokens with 30-day expiry
+AES-256 encryption for local storage
+Certificate pinning for API calls
+Biometric authentication option
+OWASP Mobile Top 10 compliance
+5.3 Scalability
+Support 10,000+ concurrent users
+Handle 100+ sensors
+Message queue for notifications
+CDN for static assets
+Database sharding ready
+5.4 Accessibility (WCAG AA)
+Minimum contrast ratio 4.5:1
+Screen reader support
+Dynamic font scaling
+Touch targets ≥48dp
+Color-blind friendly indicators
+Keyboard navigation support
+5.5 Offline Capabilities
+Feature	Offline Behavior
+Dashboard	Show cached data with timestamp
+Map	Show cached markers, no tiles
+Forecast	Show last fetched forecast
+Chat	Queue messages, sync when online
+Alerts	Show cached alerts
+6. Technical Architecture
+6.1 Technology Stack
+Frontend (Flutter)
+
+
+dependencies:
+  flutter: sdk
+  # State Management
+  provider: ^6.0.0
+  
+  # Networking
+  dio: ^5.0.0
+  connectivity_plus: ^4.0.0
+  
+  # Local Storage
+  hive: ^2.2.0
+  hive_flutter: ^1.1.0
+  flutter_secure_storage: ^9.0.0
+  
+  # Maps & Location
+  google_maps_flutter: ^2.5.0
+  geolocator: ^10.0.0
+  geocoding: ^2.1.0
+  
+  # Charts
+  fl_chart: ^0.65.0
+  
+  # Push Notifications
+  firebase_messaging: ^14.0.0
+  firebase_core: ^2.24.0
+  flutter_local_notifications: ^16.0.0
+  
+  # UI Components
+  flutter_svg: ^2.0.0
+  cached_network_image: ^3.3.0
+  shimmer: ^3.0.0
+  lottie: ^2.7.0
+  
+  # Utils
+  intl: ^0.18.0
+  url_launcher: ^6.2.0
+  share_plus: ^7.2.0
+  package_info_plus: ^5.0.0
+
+dev_dependencies:
+  flutter_test: sdk
+  mockito: ^5.4.0
+  build_runner: ^2.4.0
+  hive_generator: ^2.0.0
+Backend (Node.js)
+
+- Express.js framework
+- MongoDB with Mongoose ODM
+- JWT authentication
+- Socket.io for real-time updates
+- Bull queue for notifications
+- Redis for caching
+ML/NLP Services (Python)
+
+- FastAPI framework
+- XGBoost for AQI prediction
+- Keras LSTM for time series
+- HuggingFace Transformers (DistilBERT)
+- scikit-learn preprocessing
+6.2 Architecture Diagram
+<lov-mermaid> flowchart TB subgraph Mobile["Flutter App"] UI[Presentation Layer] BL[Business Logic] DL[Data Layer] end
+subgraph Backend["Node.js Backend"]
+    API[REST API]
+    WS[WebSocket]
+    Queue[Job Queue]
+end
+
+subgraph ML["Python ML Service"]
+    Pred[Prediction API]
+    NLP[NLP API]
+end
+
+subgraph Data["Data Storage"]
+    DB[(MongoDB)]
+    Cache[(Redis)]
+    Sensors[IoT Sensors]
+end
+
+subgraph External["External Services"]
+    FCM[Firebase Cloud Messaging]
+    Maps[Google Maps]
+    Weather[Weather API]
+end
+
+UI --> BL
+BL --> DL
+DL --> API
+DL --> WS
+API --> DB
+API --> Cache
+API --> Pred
+API --> NLP
+Queue --> FCM
+Sensors --> API
+Weather --> Pred
+6.3 Folder Structure
+lib/
+├── main.dart
+├── app/
+│   ├── app.dart
+│   ├── routes.dart
+│   └── theme.dart
+├── core/
+│   ├── constants/
+│   │   ├── api_constants.dart
+│   │   ├── app_constants.dart
+│   │   └── aqi_constants.dart
+│   ├── exceptions/
+│   │   ├── api_exception.dart
+│   │   └── cache_exception.dart
+│   ├── network/
+│   │   ├── dio_client.dart
+│   │   ├── api_interceptor.dart
+│   │   └── network_info.dart
+│   └── utils/
+│       ├── date_utils.dart
+│       ├── aqi_utils.dart
+│       └── validators.dart
+├── data/
+│   ├── datasources/
+│   │   ├── local/
+│   │   │   ├── user_local_ds.dart
+│   │   │   ├── sensor_local_ds.dart
+│   │   │   └── hive_boxes.dart
+│   │   └── remote/
+│   │       ├── auth_remote_ds.dart
+│   │       ├── sensor_remote_ds.dart
+│   │       ├── alert_remote_ds.dart
+│   │       └── chat_remote_ds.dart
+│   ├── models/
+│   │   ├── user_model.dart
+│   │   ├── health_profile_model.dart
+│   │   ├── sensor_model.dart
+│   │   ├── alert_model.dart
+│   │   ├── forecast_model.dart
+│   │   └── chat_model.dart
+│   └── repositories/
+│       ├── auth_repository_impl.dart
+│       ├── sensor_repository_impl.dart
+│       ├── alert_repository_impl.dart
+│       └── chat_repository_impl.dart
+├── domain/
+│   ├── entities/
+│   │   ├── user.dart
+│   │   ├── sensor.dart
+│   │   └── alert.dart
+│   ├── repositories/
+│   │   ├── auth_repository.dart
+│   │   ├── sensor_repository.dart
+│   │   └── alert_repository.dart
+│   └── usecases/
+│       ├── auth/
+│       │   ├── login_usecase.dart
+│       │   ├── signup_usecase.dart
+│       │   └── logout_usecase.dart
+│       ├── sensor/
+│       │   ├── get_sensors_usecase.dart
+│       │   └── get_forecast_usecase.dart
+│       └── alert/
+│           └── get_alerts_usecase.dart
+├── presentation/
+│   ├── providers/
+│   │   ├── auth_provider.dart
+│   │   ├── dashboard_provider.dart
+│   │   ├── map_provider.dart
+│   │   ├── forecast_provider.dart
+│   │   ├── chat_provider.dart
+│   │   └── settings_provider.dart
+│   ├── screens/
+│   │   ├── splash/
+│   │   │   └── splash_screen.dart
+│   │   ├── onboarding/
+│   │   │   └── onboarding_screen.dart
+│   │   ├── auth/
+│   │   │   ├── login_screen.dart
+│   │   │   ├── signup_screen.dart
+│   │   │   └── forgot_password_screen.dart
+│   │   ├── dashboard/
+│   │   │   ├── dashboard_screen.dart
+│   │   │   └── widgets/
+│   │   │       ├── aqi_gauge.dart
+│   │   │       ├── risk_card.dart
+│   │   │       └── suggestions_card.dart
+│   │   ├── map/
+│   │   │   ├── map_screen.dart
+│   │   │   └── widgets/
+│   │   │       ├── sensor_marker.dart
+│   │   │       └── sensor_detail_sheet.dart
+│   │   ├── forecast/
+│   │   │   ├── forecast_screen.dart
+│   │   │   └── widgets/
+│   │   │       ├── hourly_chart.dart
+│   │   │       └── daily_forecast.dart
+│   │   ├── chat/
+│   │   │   ├── chat_screen.dart
+│   │   │   └── widgets/
+│   │   │       ├── message_bubble.dart
+│   │   │       └── quick_replies.dart
+│   │   ├── profile/
+│   │   │   ├── profile_screen.dart
+│   │   │   └── health_form_screen.dart
+│   │   └── settings/
+│   │       └── settings_screen.dart
+│   └── widgets/
+│       ├── common/
+│       │   ├── loading_indicator.dart
+│       │   ├── error_widget.dart
+│       │   └── empty_state.dart
+│       └── aqi/
+│           ├── aqi_badge.dart
+│           └── pollutant_bar.dart
+└── services/
+    ├── notification_service.dart
+    ├── location_service.dart
+    └── analytics_service.dart
+
+test/
+├── unit/
+│   ├── auth_test.dart
+│   ├── aqi_utils_test.dart
+│   └── alert_logic_test.dart
+├── widget/
+│   ├── aqi_gauge_test.dart
+│   └── login_screen_test.dart
+└── integration/
+    └── auth_flow_test.dart
+7. UI/UX Design
+7.1 Design System
+Color Palette
+
+Name	Hex	Usage
+Primary Blue	#2196F3	App bars, buttons, links
+Good Green	#43A047	AQI 0-50, success states
+Moderate Yellow	#FFEB3B	AQI 51-100
+Sensitive Orange	#FB8C00	AQI 101-150, warnings
+Unhealthy Red	#E53935	AQI 151-200, errors
+Very Unhealthy Purple	#8E24AA	AQI 201-300
+Hazardous Maroon	#6D1B1B	AQI 301+
+Background Light	#F5F5F5	Light theme background
+Background Dark	#121212	Dark theme background
+Surface	#FFFFFF	Cards, sheets
+On Surface	#212121	Primary text
+On Surface Variant	#757575	Secondary text
+Typography
+
+
+// Using Google Fonts - Roboto family
+headline1: 96sp, Light
+headline2: 60sp, Light
+headline3: 48sp, Regular
+headline4: 34sp, Regular
+headline5: 24sp, Regular
+headline6: 20sp, Medium
+subtitle1: 16sp, Regular
+subtitle2: 14sp, Medium
+body1: 16sp, Regular
+body2: 14sp, Regular
+button: 14sp, Medium, ALL CAPS
+caption: 12sp, Regular
+overline: 10sp, Regular, ALL CAPS
+Spacing
+
+4dp, 8dp, 12dp, 16dp, 24dp, 32dp, 48dp, 64dp
+Border Radius
+
+Small: 4dp (chips, small buttons)
+Medium: 8dp (cards, inputs)
+Large: 16dp (bottom sheets, modals)
+Circular: 50% (avatars, FABs)
+7.2 Screen Wireframes
+Bottom Navigation
+
+┌─────────────────────────────────────┐
+│  [Dashboard] [Map] [Forecast] [Chat] [Profile]  │
+└─────────────────────────────────────┘
+Dashboard Layout
+
+┌─────────────────────────────────────┐
+│ ☰  Air Quality Guardian    🔔  ⚙️  │
+├─────────────────────────────────────┤
+│  📍 Downtown Area                   │
+│  ┌─────────────────────────────┐   │
+│  │                             │   │
+│  │     ╭───────────────╮      │   │
+│  │     │      156      │      │   │
+│  │     │   UNHEALTHY   │      │   │
+│  │     ╰───────────────╯      │   │
+│  │                             │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│  ⚠️ Your Risk Level: HIGH          │
+│  Based on your asthma condition     │
+│                                     │
+│  💡 Recommendations                 │
+│  ┌─────────────────────────────┐   │
+│  │ • Wear N95 mask outdoors    │   │
+│  │ • Limit outdoor activities   │   │
+│  │ • Keep windows closed        │   │
+│  └─────────────────────────────┘   │
+│                                     │
+│  📊 Pollutant Levels               │
+│  PM2.5  ████████████░░ 85 µg/m³   │
+│  PM10   ██████████░░░░ 120 µg/m³  │
+│  O3     ██████░░░░░░░░ 45 ppb     │
+└─────────────────────────────────────┘
+8. Database Schema
+8.1 MongoDB Collections
+users
+
+
+{
+  _id: ObjectId,
+  name: String,
+  email: String (unique, indexed),
+  passwordHash: String,
+  isVerified: Boolean,
+  fcmToken: String,
+  createdAt: Date,
+  updatedAt: Date
+}
+health_profiles
+
+
+{
+  _id: ObjectId,
+  userId: ObjectId (ref: users, indexed),
+  age: Number,
+  gender: String (enum: male, female, other, prefer_not_to_say),
+  conditions
+  activityLevel: String (enum: sedentary, light, moderate, active, very_active),
+  sensitivity: Number (1-5),
+  outdoorHours: Number,
+  notificationPrefs: {
+    push: Boolean,
+    email: Boolean,
+    sms: Boolean,
+    alertTypes: [String]
+  },
+  updatedAt: Date
+}
+sensors
+
+
+{
+  _id: ObjectId,
+  deviceId: String (unique),
+  name: String,
+  location: {
+    type: "Point",
+    coordinates: [longitude, latitude]
+  },
+  address: String,
+  isOnline: Boolean,
+  lastSeen: Date,
+  createdAt: Date
+}
+// Index: { location: "2dsphere" }
+sensor_readings
+
+
+{
+  _id: ObjectId,
+  sensorId: ObjectId (ref: sensors, indexed),
+  timestamp: Date (indexed),
+  aqi: Number,
+  pollutants: {
+    pm25: Number,
+    pm10: Number,
+    o3: Number,
+    no2: Number,
+    so2: Number,
+    co: Number
+  },
+  temperature: Number,
+  humidity: Number
+}
+// TTL Index: { timestamp: 1 }, expireAfterSeconds: 2592000 (30 days)
+sensor_predictions
+
+
+{
+  _id: ObjectId,
+  sensorId: ObjectId (ref: sensors),
+  generatedAt: Date,
+  hourlyPredictions: [{
+    hour: Date,
+    aqi: Number,
+    confidence: Number,
+    pollutants: Object
+  }],
+  dailyPredictions: [{
+    date: Date,
+    highAqi: Number,
+    lowAqi: Number,
+    dominantPollutant: String
+  }],
+  nlpSummary: String
+}
+alerts
+
+
+{
+  _id: ObjectId,
+  userId: ObjectId (ref: users, indexed),
+  type: String (enum: threshold, spike, forecast, recovery, daily),
+  severity: String (enum: info, warning, critical),
+  title: String,
+  message: String,
+  sensorId: ObjectId (ref: sensors),
+  aqiValue: Number,
+  isRead: Boolean,
+  createdAt: Date (indexed)
+}
+chat_conversations
+
+
+{
+  _id: ObjectId,
+  userId: ObjectId (ref: users, indexed),
+  messages: [{
+    role: String (enum: user, assistant),
+    content: String,
+    timestamp: Date,
+    metadata: Object
+  }],
+  createdAt: Date,
+  updatedAt: Date
+}
+9. API Specification
+9.1 Base Configuration
+Base URL: https://api.airqualityguardian.com/v1
+Content-Type: application/json
+Authentication: Bearer <JWT>
+9.2 Response Format
+
+// Success
+{
+  "success": true,
+  "data": { ... },
+  "message": "Operation successful"
+}
+
+// Error
+{
+  "success": false,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human readable message",
+    "details": { ... }
+  }
+}
+9.3 Error Codes
+Code	HTTP Status	Description
+AUTH_INVALID_CREDENTIALS	401	Wrong email/password
+AUTH_TOKEN_EXPIRED	401	JWT expired
+AUTH_UNAUTHORIZED	403	Insufficient permissions
+VALIDATION_ERROR	400	Invalid input
+NOT_FOUND	404	Resource not found
+RATE_LIMITED	429	Too many requests
+SERVER_ERROR	500	Internal error
+10. Testing Strategy
+10.1 Unit Tests
+
+// Example: AQI calculation test
+test('should return correct AQI category', () {
+  expect(getAqiCategory(25), equals('Good'));
+  expect(getAqiCategory(75), equals('Moderate'));
+  expect(getAqiCategory(125), equals('Unhealthy for Sensitive'));
+  expect(getAqiCategory(175), equals('Unhealthy'));
+  expect(getAqiCategory(250), equals('Very Unhealthy'));
+  expect(getAqiCategory(350), equals('Hazardous'));
+});
+
+// Example: Auth validation test
+test('should validate email format', () {
+  expect(isValidEmail('test@email.com'), isTrue);
+  expect(isValidEmail('invalid-email'), isFalse);
+});
+10.2 Widget Tests
+
+testWidgets('AQI Gauge displays correct value', (tester) async {
+  await tester.pumpWidget(
+    MaterialApp(home: AqiGauge(value: 150)),
+  );
+  
+  expect(find.text('150'), findsOneWidget);
+  expect(find.text('UNHEALTHY'), findsOneWidget);
+});
+10.3 Integration Tests
+
+testWidgets('Login flow works correctly', (tester) async {
+  await tester.pumpWidget(MyApp());
+  
+  // Enter credentials
+  await tester.enterText(find.byKey(Key('email')), 'test@email.com');
+  await tester.enterText(find.byKey(Key('password')), 'password123');
+  
+  // Tap login
+  await tester.tap(find.byKey(Key('loginButton')));
+  await tester.pumpAndSettle();
+  
+  // Verify navigation to dashboard
+  expect(find.byType(DashboardScreen), findsOneWidget);
+});
+11. Deployment & DevOps
+11.1 CI/CD Pipeline
+
+# .github/workflows/flutter.yml
+name: Flutter CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test --coverage
+      
+  build-android:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+      - run: flutter build apk --release
+      
+  build-ios:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+      - run: flutter build ios --release --no-codesign
+11.2 Environment Configuration
+# .env.development
+API_BASE_URL=https://dev-api.airqualityguardian.com/v1
+GOOGLE_MAPS_KEY=dev_key
+FIREBASE_PROJECT=aqg-dev
+
+# .env.production
+API_BASE_URL=https://api.airqualityguardian.com/v1
+GOOGLE_MAPS_KEY=prod_key
+FIREBASE_PROJECT=aqg-prod
+12. Timeline & Milestones
+Week	Phase	Deliverables
+1	Foundation	Project setup, Auth screens, Profile form, Basic navigation
+2	Core Features	Dashboard UI, Map integration, Sensor API integration
+3	Advanced Features	Forecast charts, Chat interface, Push notifications
+4	Polish & Launch	Testing, Bug fixes, Performance optimization, App store submission
+13. Risks & Mitigations
+Risk	Probability	Impact	Mitigation
+API rate limits	Medium	High	Implement caching, request throttling
+GPS accuracy issues	Medium	Medium	Allow manual location selection
+ML model drift	Low	High	Monthly model retraining, A/B testing
+Privacy concerns	Medium	High	Clear consent flows, data encryption
+Offline sync conflicts	Medium	Medium	Timestamp-based conflict resolution
+14. Future Enhancements (v2.0+)
+ Apple Watch / Wear OS companion app
+ Air purifier device integration
+ Social features (share air quality)
+ Gamification (health points, badges)
+ Indoor air quality sensors
+ Multi-language support (10+ languages)
+ Enterprise API for B2B clients
+15. Appendix
+A. AQI Calculation Reference
+AQI = ((IHI - ILO) / (BPHi - BPLo)) * (Cp - BPLo) + ILo
+
+Where:
+- IHI = AQI value corresponding to BPHi
+- ILO = AQI value corresponding to BPLo
+- BPHi = Breakpoint ≥ Cp
+- BPLo = Breakpoint ≤ Cp
+- Cp = Pollutant concentration
+B. Glossary
+AQI: Air Quality Index
+PM2.5: Particulate Matter ≤2.5 micrometers
+PM10: Particulate Matter ≤10 micrometers
+O3: Ozone
+NO2: Nitrogen Dioxide
+SO2: Sulfur Dioxide
+CO: Carbon Monoxide
+FCM: Firebase Cloud Messaging
+JWT: JSON Web Token

@@ -1,0 +1,1130 @@
+{
+  "project_metadata": {
+    "app_name": "Air Quality Guardian",
+    "version": "1.0.0",
+    "platform": "Flutter (iOS & Android)",
+    "description": "Cross-platform mobile application for real-time air quality monitoring with ML-powered forecasts and AI chatbot",
+    "target_sdk": {
+      "flutter": ">=3.0.0",
+      "dart": ">=3.0.0"
+    }
+  },
+  "architecture": {
+    "pattern": "Clean Architecture",
+    "layers": [
+      "Presentation (UI + State Management)",
+      "Domain (Business Logic + Use Cases)",
+      "Data (Repositories + Data Sources)"
+    ],
+    "state_management": "Provider",
+    "dependency_injection": "GetIt (Service Locator)"
+  },
+  "modules": [
+    {
+      "name": "Authentication",
+      "priority": "critical",
+      "features": [
+        {
+          "name": "User Registration",
+          "screens": ["SignupScreen"],
+          "validations": {
+            "name": "2-50 characters, required",
+            "email": "valid email format, required",
+            "password": "min 8 chars, 1 uppercase, 1 number, required",
+            "confirmPassword": "must match password"
+          },
+          "api_endpoint": "POST /auth/signup",
+          "request_body": {
+            "name": "string",
+            "email": "string",
+            "password": "string"
+          },
+          "response": {
+            "user": "User object",
+            "token": "JWT string"
+          }
+        },
+        {
+          "name": "User Login",
+          "screens": ["LoginScreen"],
+          "features": ["Remember me", "Forgot password link"],
+          "api_endpoint": "POST /auth/login",
+          "request_body": {
+            "email": "string",
+            "password": "string"
+          },
+          "response": {
+            "user": "User object",
+            "token": "JWT string",
+            "refreshToken": "string"
+          }
+        },
+        {
+          "name": "Password Recovery",
+          "screens": ["ForgotPasswordScreen"],
+          "flow": [
+            "Enter registered email",
+            "Receive OTP via email",
+            "Enter OTP + new password",
+            "Redirect to login"
+          ],
+          "api_endpoints": [
+            "POST /auth/forgot-password",
+            "POST /auth/reset-password"
+          ]
+        }
+      ],
+      "data_models": [
+        {
+          "name": "User",
+          "fields": {
+            "id": "String",
+            "name": "String",
+            "email": "String",
+            "passwordHash": "String",
+            "createdAt": "DateTime",
+            "updatedAt": "DateTime",
+            "isVerified": "bool",
+            "fcmToken": "String?"
+          }
+        }
+      ],
+      "local_storage": {
+        "secure_storage": ["JWT token", "Refresh token"],
+        "hive": ["User profile cache"]
+      }
+    },
+    {
+      "name": "Health Profile",
+      "priority": "critical",
+      "features": [
+        {
+          "name": "Profile Form",
+          "screens": ["HealthFormScreen"],
+          "form_fields": [
+            {
+              "name": "age",
+              "type": "Number",
+              "range": "1-120",
+              "required": true
+            },
+            {
+              "name": "gender",
+              "type": "Select",
+              "options": ["Male", "Female", "Other", "Prefer not to say"],
+              "required": true
+            },
+            {
+              "name": "healthConditions",
+              "type": "Multi-select",
+              "options": ["Asthma", "COPD", "Heart Disease", "Allergies", "Diabetes", "None"],
+              "required": true
+            },
+            {
+              "name": "activityLevel",
+              "type": "Select",
+              "options": ["Sedentary", "Light", "Moderate", "Active", "Very Active"],
+              "required": true
+            },
+            {
+              "name": "pollutionSensitivity",
+              "type": "Slider",
+              "range": "1-5",
+              "labels": ["Low", "High"],
+              "required": true
+            },
+            {
+              "name": "outdoorHours",
+              "type": "Number",
+              "range": "0-24",
+              "required": false
+            },
+            {
+              "name": "notificationPreferences",
+              "type": "Multi-select",
+              "options": ["Push", "Email", "SMS"],
+              "required": true
+            }
+          ],
+          "api_endpoints": [
+            "GET /user/profile/:userId",
+            "PUT /user/profile/:userId",
+            "DELETE /user/profile/:userId"
+          ]
+        }
+      ],
+      "data_models": [
+        {
+          "name": "HealthProfile",
+          "fields": {
+            "id": "String",
+            "userId": "String",
+            "age": "int",
+            "gender": "String",
+            "conditions": "List<String>",
+            "activityLevel": "String",
+            "sensitivity": "int (1-5)",
+            "outdoorHours": "double",
+            "notificationPrefs": "NotificationPrefs",
+            "updatedAt": "DateTime"
+          }
+        },
+        {
+          "name": "NotificationPrefs",
+          "fields": {
+            "push": "bool",
+            "email": "bool",
+            "sms": "bool",
+            "alertTypes": "List<String>"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "priority": "critical",
+      "features": [
+        {
+          "name": "Main Dashboard",
+          "screens": ["DashboardScreen"],
+          "components": [
+            {
+              "name": "AQI Gauge Card",
+              "widget": "AqiGauge",
+              "description": "Circular gauge showing current AQI (0-500)",
+              "color_coding": {
+                "Good": "0-50 (#43A047)",
+                "Moderate": "51-100 (#FFEB3B)",
+                "Unhealthy for Sensitive": "101-150 (#FB8C00)",
+                "Unhealthy": "151-200 (#E53935)",
+                "Very Unhealthy": "201-300 (#8E24AA)",
+                "Hazardous": "301-500 (#6D1B1B)"
+              },
+              "interactions": ["Tap to see pollutant breakdown"]
+            },
+            {
+              "name": "Risk Assessment Card",
+              "widget": "RiskCard",
+              "description": "Personalized risk level based on AQI + user health profile",
+              "risk_levels": ["Low", "Medium", "High", "Severe"],
+              "display": ["Icon indicator", "Color coding", "Brief explanation"]
+            },
+            {
+              "name": "Health Suggestions Card",
+              "widget": "SuggestionsCard",
+              "description": "3-5 actionable recommendations",
+              "examples": [
+                "Wear N95 mask if going outside",
+                "Close windows and use air purifier",
+                "Avoid strenuous outdoor exercise"
+              ],
+              "personalization": "Based on user health conditions"
+            },
+            {
+              "name": "Pollutant Breakdown",
+              "widget": "PollutantBar",
+              "pollutants": ["PM2.5", "PM10", "O3", "NO2", "SO2", "CO"],
+              "display": "Bar chart with WHO guideline comparison"
+            }
+          ],
+          "api_endpoints": [
+            "GET /sensors/realtime",
+            "GET /sensors/realtime/:id",
+            "GET /dashboard/:userId"
+          ]
+        }
+      ],
+      "data_models": [
+        {
+          "name": "DashboardData",
+          "fields": {
+            "currentAqi": "int",
+            "aqiCategory": "String",
+            "riskLevel": "String",
+            "suggestions": "List<String>",
+            "pollutants": "List<Pollutant>",
+            "location": "SensorLocation",
+            "timestamp": "DateTime"
+          }
+        },
+        {
+          "name": "Pollutant",
+          "fields": {
+            "name": "String",
+            "value": "double",
+            "unit": "String",
+            "whoGuideline": "double",
+            "status": "String (good/moderate/unhealthy)"
+          }
+        },
+        {
+          "name": "SensorLocation",
+          "fields": {
+            "id": "String",
+            "name": "String",
+            "latitude": "double",
+            "longitude": "double",
+            "address": "String"
+          }
+        }
+      ],
+      "offline_support": {
+        "cache_duration": "30 minutes",
+        "display": "Show cached data with timestamp indicator"
+      }
+    },
+    {
+      "name": "Map",
+      "priority": "critical",
+      "features": [
+        {
+          "name": "Interactive Map",
+          "screens": ["MapScreen"],
+          "map_provider": "Google Maps",
+          "components": [
+            {
+              "name": "Map Display",
+              "features": [
+                "User's current location (with permission)",
+                "All sensor locations as markers",
+                "Marker color = AQI category color",
+                "Cluster markers when zoomed out"
+              ]
+            },
+            {
+              "name": "Marker Interactions",
+              "on_tap": {
+                "show_info_window": [
+                  "Location name",
+                  "Current AQI",
+                  "Last updated time",
+                  "View Details button"
+                ]
+              },
+              "on_view_details": {
+                "show_bottom_sheet": [
+                  "Full pollutant breakdown",
+                  "24h mini chart",
+                  "Health advice for that area",
+                  "Get Directions button"
+                ]
+              }
+            },
+            {
+              "name": "Map Controls",
+              "controls": [
+                "Zoom in/out buttons",
+                "Current location button",
+                "Layer toggle (satellite/terrain)",
+                "Filter by AQI range"
+              ]
+            }
+          ],
+          "api_endpoints": [
+            "GET /sensors",
+            "GET /sensors/:id",
+            "GET /sensors/history/:id",
+            "GET /sensors/nearby?lat=&lng=&radius="
+          ]
+        }
+      ],
+      "data_models": [
+        {
+          "name": "Sensor",
+          "fields": {
+            "id": "String",
+            "name": "String",
+            "latitude": "double",
+            "longitude": "double",
+            "address": "String",
+            "currentAqi": "int",
+            "pollutants": "Map<String, double>",
+            "lastUpdated": "DateTime",
+            "isOnline": "bool"
+          }
+        },
+        {
+          "name": "SensorHistory",
+          "fields": {
+            "sensorId": "String",
+            "timestamp": "DateTime",
+            "aqi": "int",
+            "pollutants": "Map<String, double>"
+          }
+        }
+      ],
+      "permissions": ["Location (Fine & Coarse)"],
+      "offline_support": {
+        "behavior": "Show cached markers, no map tiles"
+      }
+    },
+    {
+      "name": "Forecast",
+      "priority": "high",
+      "features": [
+        {
+          "name": "Forecast Display",
+          "screens": ["ForecastScreen"],
+          "components": [
+            {
+              "name": "24-Hour Forecast",
+              "widget": "HourlyChart",
+              "chart_type": "Line chart",
+              "x_axis": "Hours (now to +24h)",
+              "y_axis": "AQI (0-300+)",
+              "features": [
+                "Color zones for AQI categories",
+                "Tap point for details"
+              ]
+            },
+            {
+              "name": "7-Day Forecast",
+              "widget": "DailyForecast",
+              "display_type": "Bar chart or card list",
+              "data": [
+                "Daily high/low AQI",
+                "Weather correlation icons",
+                "Best/worst times highlighted"
+              ]
+            },
+            {
+              "name": "NLP Summary",
+              "description": "AI-generated natural language summary",
+              "example": "Air quality will be moderate tomorrow morning but may worsen to unhealthy levels by evening due to expected traffic congestion. Consider completing outdoor activities before 2 PM."
+            },
+            {
+              "name": "Activity Planner",
+              "suggestions": [
+                "Outdoor exercise",
+                "Commuting",
+                "Children's outdoor play"
+              ],
+              "personalization": "Based on forecast + user profile"
+            }
+          ],
+          "api_endpoints": [
+            "GET /sensors/forecast/:id",
+            "GET /forecast/summary/:userId"
+          ]
+        }
+      ],
+      "data_models": [
+        {
+          "name": "Forecast",
+          "fields": {
+            "sensorId": "String",
+            "hourly": "List<HourlyForecast>",
+            "daily": "List<DailyForecast>",
+            "nlpSummary": "String",
+            "activities": "List<ActivitySuggestion>",
+            "generatedAt": "DateTime"
+          }
+        },
+        {
+          "name": "HourlyForecast",
+          "fields": {
+            "hour": "DateTime",
+            "predictedAqi": "int",
+            "confidence": "double",
+            "pollutants": "Map<String, double>"
+          }
+        },
+        {
+          "name": "DailyForecast",
+          "fields": {
+            "date": "DateTime",
+            "highAqi": "int",
+            "lowAqi": "int",
+            "dominantPollutant": "String",
+            "weatherCondition": "String"
+          }
+        },
+        {
+          "name": "ActivitySuggestion",
+          "fields": {
+            "activity": "String",
+            "bestStartTime": "DateTime",
+            "bestEndTime": "DateTime",
+            "reason": "String"
+          }
+        }
+      ],
+      "chart_library": "fl_chart"
+    },
+    {
+      "name": "Alerts",
+      "priority": "high",
+      "features": [
+        {
+          "name": "Alert System",
+          "alert_types": [
+            {
+              "type": "Threshold Alert",
+              "trigger": "AQI exceeds user's sensitivity threshold",
+              "severity": "Based on AQI"
+            },
+            {
+              "type": "Spike Alert",
+              "trigger": "Sudden AQI increase (>50 in 1 hour)",
+              "severity": "High"
+            },
+            {
+              "type": "Forecast Alert",
+              "trigger": "Predicted unhealthy conditions",
+              "severity": "Medium"
+            },
+            {
+              "type": "Recovery Alert",
+              "trigger": "AQI returns to safe levels",
+              "severity": "Low"
+            },
+            {
+              "type": "Daily Summary",
+              "trigger": "End of day digest",
+              "severity": "Info"
+            }
+          ],
+          "delivery_channels": [
+            {
+              "channel": "Push notification",
+              "service": "Firebase Cloud Messaging (FCM)",
+              "priority": "primary"
+            },
+            {
+              "channel": "In-app notification bell",
+              "priority": "primary"
+            },
+            {
+              "channel": "Email",
+              "priority": "optional"
+            },
+            {
+              "channel": "SMS",
+              "priority": "premium"
+            }
+          ],
+          "notification_format": {
+            "title": "⚠️ Air Quality Alert",
+            "body": "{Location}: AQI reached {value} ({category}). {recommendation}",
+            "action": "Deep link to dashboard/map"
+          },
+          "api_endpoints": [
+            "GET /alerts/:userId",
+            "PUT /alerts/:alertId/read",
+            "DELETE /alerts/:alertId",
+            "PUT /alerts/settings/:userId"
+          ]
+        }
+      ],
+      "data_models": [
+        {
+          "name": "Alert",
+          "fields": {
+            "id": "String",
+            "userId": "String",
+            "type": "String",
+            "severity": "String (info/warning/critical)",
+            "title": "String",
+            "message": "String",
+            "sensorId": "String?",
+            "aqiValue": "int?",
+            "timestamp": "DateTime",
+            "isRead": "bool",
+            "deepLink": "String?"
+          }
+        }
+      ],
+      "services": ["NotificationService", "FCM Integration"]
+    },
+    {
+      "name": "Chat (AI Assistant)",
+      "priority": "high",
+      "features": [
+        {
+          "name": "AI Chat Interface",
+          "screens": ["ChatScreen"],
+          "components": [
+            {
+              "name": "Chat Interface",
+              "widgets": ["MessageBubble", "QuickReplies"],
+              "features": [
+                "Message bubbles (user right, bot left)",
+                "Typing indicator",
+                "Quick reply suggestions",
+                "Rich responses (cards, charts)",
+                "Voice input option"
+              ]
+            }
+          ],
+          "capabilities": [
+            {
+              "category": "Health Queries",
+              "examples": [
+                "Is it safe to jog today?",
+                "What precautions for my asthma?"
+              ]
+            },
+            {
+              "category": "AQI Explanations",
+              "examples": [
+                "What does PM2.5 mean?",
+                "Why is AQI high today?"
+              ]
+            },
+            {
+              "category": "Recommendations",
+              "examples": [
+                "Best time to go outside?",
+                "Should I wear a mask?"
+              ]
+            },
+            {
+              "category": "Historical Analysis",
+              "examples": [
+                "How was air quality last week?",
+                "Compare today vs yesterday"
+              ]
+            },
+            {
+              "category": "General Information",
+              "examples": [
+                "What causes air pollution?",
+                "How can I improve indoor air?"
+              ]
+            }
+          ],
+          "api_endpoints": [
+            "POST /chat/query",
+            "GET /chat/history/:userId",
+            "DELETE /chat/history/:userId"
+          ]
+        }
+      ],
+      "data_models": [
+        {
+          "name": "ChatMessage",
+          "fields": {
+            "id": "String",
+            "conversationId": "String",
+            "role": "String (user/assistant)",
+            "content": "String",
+            "quickReplies": "List<QuickReply>?",
+            "richContent": "RichContent?",
+            "timestamp": "DateTime"
+          }
+        },
+        {
+          "name": "QuickReply",
+          "fields": {
+            "label": "String",
+            "value": "String"
+          }
+        },
+        {
+          "name": "RichContent",
+          "fields": {
+            "type": "String (card/chart/link)",
+            "data": "Map<String, dynamic>"
+          }
+        },
+        {
+          "name": "Conversation",
+          "fields": {
+            "id": "String",
+            "userId": "String",
+            "messages": "List<ChatMessage>",
+            "createdAt": "DateTime",
+            "updatedAt": "DateTime"
+          }
+        }
+      ],
+      "nlp_backend": "Python FastAPI with HuggingFace Transformers (DistilBERT)"
+    },
+    {
+      "name": "Settings",
+      "priority": "medium",
+      "features": [
+        {
+          "name": "Settings Screen",
+          "screens": ["SettingsScreen"],
+          "sections": [
+            {
+              "name": "Account Settings",
+              "options": [
+                "Edit name",
+                "Change email",
+                "Change password",
+                "Delete account"
+              ]
+            },
+            {
+              "name": "Notification Settings",
+              "options": [
+                "Push notifications toggle",
+                "Alert types selection",
+                "Quiet hours",
+                "Email preferences"
+              ]
+            },
+            {
+              "name": "Display Settings",
+              "options": [
+                "Theme (Light/Dark/System)",
+                "Language selection",
+                "Units (AQI scale selection)",
+                "Map default view"
+              ]
+            },
+            {
+              "name": "Privacy",
+              "options": [
+                "Location permissions",
+                "Data sharing consent",
+                "Export my data",
+                "Privacy policy link"
+              ]
+            },
+            {
+              "name": "About",
+              "options": [
+                "App version",
+                "Terms of service",
+                "Contact support",
+                "Rate app"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Onboarding & Splash",
+      "priority": "low",
+      "features": [
+        {
+          "name": "Splash Screen",
+          "screens": ["SplashScreen"],
+          "duration": "2 seconds",
+          "checks": ["Auth token validation", "Initial data fetch"]
+        },
+        {
+          "name": "Onboarding",
+          "screens": ["OnboardingScreen"],
+          "slides": [
+            {
+              "title": "Real-time Air Quality",
+              "description": "Monitor air quality in your area with live sensor data",
+              "illustration": "Lottie animation"
+            },
+            {
+              "title": "Personalized Alerts",
+              "description": "Get health-aware notifications based on your profile",
+              "illustration": "Lottie animation"
+            },
+            {
+              "title": "Smart Forecasts",
+              "description": "Plan your activities with AI-powered predictions",
+              "illustration": "Lottie animation"
+            }
+          ],
+          "show_once": true
+        }
+      ]
+    }
+  ],
+  "dependencies": {
+    "state_management": {
+      "provider": "^6.0.0"
+    },
+    "networking": {
+      "dio": "^5.0.0",
+      "connectivity_plus": "^4.0.0"
+    },
+    "local_storage": {
+      "hive": "^2.2.0",
+      "hive_flutter": "^1.1.0",
+      "flutter_secure_storage": "^9.0.0"
+    },
+    "maps_location": {
+      "google_maps_flutter": "^2.5.0",
+      "geolocator": "^10.0.0",
+      "geocoding": "^2.1.0"
+    },
+    "charts": {
+      "fl_chart": "^0.65.0"
+    },
+    "push_notifications": {
+      "firebase_messaging": "^14.0.0",
+      "firebase_core": "^2.24.0",
+      "flutter_local_notifications": "^16.0.0"
+    },
+    "ui_components": {
+      "flutter_svg": "^2.0.0",
+      "cached_network_image": "^3.3.0",
+      "shimmer": "^3.0.0",
+      "lottie": "^2.7.0"
+    },
+    "utils": {
+      "intl": "^0.18.0",
+      "url_launcher": "^6.2.0",
+      "share_plus": "^7.2.0",
+      "package_info_plus": "^5.0.0"
+    },
+    "dev_dependencies": {
+      "flutter_test": "sdk",
+      "mockito": "^5.4.0",
+      "build_runner": "^2.4.0",
+      "hive_generator": "^2.0.0"
+    }
+  },
+  "design_system": {
+    "color_palette": {
+      "primary_blue": "#2196F3",
+      "good_green": "#43A047",
+      "moderate_yellow": "#FFEB3B",
+      "sensitive_orange": "#FB8C00",
+      "unhealthy_red": "#E53935",
+      "very_unhealthy_purple": "#8E24AA",
+      "hazardous_maroon": "#6D1B1B",
+      "background_light": "#F5F5F5",
+      "background_dark": "#121212",
+      "surface": "#FFFFFF",
+      "on_surface": "#212121",
+      "on_surface_variant": "#757575"
+    },
+    "typography": {
+      "font_family": "Roboto",
+      "headline1": "96sp, Light",
+      "headline2": "60sp, Light",
+      "headline3": "48sp, Regular",
+      "headline4": "34sp, Regular",
+      "headline5": "24sp, Regular",
+      "headline6": "20sp, Medium",
+      "subtitle1": "16sp, Regular",
+      "subtitle2": "14sp, Medium",
+      "body1": "16sp, Regular",
+      "body2": "14sp, Regular",
+      "button": "14sp, Medium, ALL CAPS",
+      "caption": "12sp, Regular",
+      "overline": "10sp, Regular, ALL CAPS"
+    },
+    "spacing": [4, 8, 12, 16, 24, 32, 48, 64],
+    "border_radius": {
+      "small": "4dp",
+      "medium": "8dp",
+      "large": "16dp",
+      "circular": "50%"
+    }
+  },
+  "navigation": {
+    "type": "Bottom Navigation Bar",
+    "tabs": [
+      {
+        "name": "Dashboard",
+        "icon": "home",
+        "route": "/dashboard"
+      },
+      {
+        "name": "Map",
+        "icon": "map",
+        "route": "/map"
+      },
+      {
+        "name": "Forecast",
+        "icon": "trending_up",
+        "route": "/forecast"
+      },
+      {
+        "name": "Chat",
+        "icon": "chat",
+        "route": "/chat"
+      },
+      {
+        "name": "Profile",
+        "icon": "person",
+        "route": "/profile"
+      }
+    ]
+  },
+  "api_configuration": {
+    "base_url": {
+      "development": "https://dev-api.airqualityguardian.com/v1",
+      "production": "https://api.airqualityguardian.com/v1"
+    },
+    "authentication": {
+      "type": "JWT Bearer Token",
+      "token_expiry": "1 hour",
+      "refresh_token_expiry": "30 days"
+    },
+    "response_format": {
+      "success": {
+        "success": true,
+        "data": "object",
+        "message": "string"
+      },
+      "error": {
+        "success": false,
+        "error": {
+          "code": "string",
+          "message": "string",
+          "details": "object"
+        }
+      }
+    },
+    "error_codes": {
+      "AUTH_INVALID_CREDENTIALS": 401,
+      "AUTH_TOKEN_EXPIRED": 401,
+      "AUTH_UNAUTHORIZED": 403,
+      "VALIDATION_ERROR": 400,
+      "NOT_FOUND": 404,
+      "RATE_LIMITED": 429,
+      "SERVER_ERROR": 500
+    }
+  },
+  "security": {
+    "requirements": [
+      "HTTPS for all API calls",
+      "JWT tokens with 1-hour expiry",
+      "Refresh tokens with 30-day expiry",
+      "AES-256 encryption for local storage",
+      "Certificate pinning for API calls",
+      "Biometric authentication option",
+      "OWASP Mobile Top 10 compliance"
+    ]
+  },
+  "performance_targets": {
+    "app_launch_time": "<2 seconds",
+    "screen_transition": "<300ms",
+    "api_response_time": "<1 second",
+    "map_load_time": "<3 seconds",
+    "offline_data_access": "<500ms"
+  },
+  "offline_capabilities": {
+    "dashboard": "Show cached data with timestamp",
+    "map": "Show cached markers, no tiles",
+    "forecast": "Show last fetched forecast",
+    "chat": "Queue messages, sync when online",
+    "alerts": "Show cached alerts"
+  },
+  "testing_strategy": {
+    "unit_tests": [
+      "AQI calculation logic",
+      "Email/password validation",
+      "Date formatting utilities",
+      "Risk level calculation"
+    ],
+    "widget_tests": [
+      "AQI Gauge display",
+      "Login form validation",
+      "Chart rendering",
+      "Alert card display"
+    ],
+    "integration_tests": [
+      "Complete login flow",
+      "Dashboard data loading",
+      "Map marker interactions",
+      "Chat message sending"
+    ]
+  },
+  "folder_structure": {
+    "lib": {
+      "main.dart": "App entry point",
+      "app": {
+        "app.dart": "App configuration",
+        "routes.dart": "Route definitions",
+        "theme.dart": "Theme configuration"
+      },
+      "core": {
+        "constants": ["api_constants.dart", "app_constants.dart", "aqi_constants.dart"],
+        "exceptions": ["api_exception.dart", "cache_exception.dart"],
+        "network": ["dio_client.dart", "api_interceptor.dart", "network_info.dart"],
+        "utils": ["date_utils.dart", "aqi_utils.dart", "validators.dart"]
+      },
+      "data": {
+        "datasources": {
+          "local": ["user_local_ds.dart", "sensor_local_ds.dart", "hive_boxes.dart"],
+          "remote": ["auth_remote_ds.dart", "sensor_remote_ds.dart", "alert_remote_ds.dart", "chat_remote_ds.dart"]
+        },
+        "models": ["user_model.dart", "health_profile_model.dart", "sensor_model.dart", "alert_model.dart", "forecast_model.dart", "chat_model.dart"],
+        "repositories": ["auth_repository_impl.dart", "sensor_repository_impl.dart", "alert_repository_impl.dart", "chat_repository_impl.dart"]
+      },
+      "domain": {
+        "entities": ["user.dart", "sensor.dart", "alert.dart"],
+        "repositories": ["auth_repository.dart", "sensor_repository.dart", "alert_repository.dart"],
+        "usecases": {
+          "auth": ["login_usecase.dart", "signup_usecase.dart", "logout_usecase.dart"],
+          "sensor": ["get_sensors_usecase.dart", "get_forecast_usecase.dart"],
+          "alert": ["get_alerts_usecase.dart"]
+        }
+      },
+      "presentation": {
+        "providers": ["auth_provider.dart", "dashboard_provider.dart", "map_provider.dart", "forecast_provider.dart", "chat_provider.dart", "settings_provider.dart"],
+        "screens": {
+          "splash": ["splash_screen.dart"],
+          "onboarding": ["onboarding_screen.dart"],
+          "auth": ["login_screen.dart", "signup_screen.dart", "forgot_password_screen.dart"],
+          "dashboard": {
+            "dashboard_screen.dart": "Main dashboard",
+            "widgets": ["aqi_gauge.dart", "risk_card.dart", "suggestions_card.dart"]
+          },
+          "map": {
+            "map_screen.dart": "Map view",
+            "widgets": ["sensor_marker.dart", "sensor_detail_sheet.dart"]
+          },
+          "forecast": {
+            "forecast_screen.dart": "Forecast view",
+            "widgets": ["hourly_chart.dart", "daily_forecast.dart"]
+          },
+          "chat": {
+            "chat_screen.dart": "Chat interface",
+            "widgets": ["message_bubble.dart", "quick_replies.dart"]
+          },
+          "profile": ["profile_screen.dart", "health_form_screen.dart"],
+          "settings": ["settings_screen.dart"]
+        },
+        "widgets": {
+          "common": ["loading_indicator.dart", "error_widget.dart", "empty_state.dart"],
+          "aqi": ["aqi_badge.dart", "pollutant_bar.dart"]
+        }
+      },
+      "services": ["notification_service.dart", "location_service.dart", "analytics_service.dart"]
+    },
+    "test": {
+      "unit": ["auth_test.dart", "aqi_utils_test.dart", "alert_logic_test.dart"],
+      "widget": ["aqi_gauge_test.dart", "login_screen_test.dart"],
+      "integration": ["auth_flow_test.dart"]
+    }
+  },
+  "backend_requirements": {
+    "technology": "Node.js with Express.js",
+    "database": "MongoDB with Mongoose ODM",
+    "authentication": "JWT",
+    "real_time": "Socket.io",
+    "job_queue": "Bull",
+    "caching": "Redis",
+    "collections": [
+      {
+        "name": "users",
+        "indexes": ["email (unique)"],
+        "fields": ["_id", "name", "email", "passwordHash", "isVerified", "fcmToken", "createdAt", "updatedAt"]
+      },
+      {
+        "name": "health_profiles",
+        "indexes": ["userId"],
+        "fields": ["_id", "userId", "age", "gender", "conditions", "activityLevel", "sensitivity", "outdoorHours", "notificationPrefs", "updatedAt"]
+      },
+      {
+        "name": "sensors",
+        "indexes": ["deviceId (unique)", "location (2dsphere)"],
+        "fields": ["_id", "deviceId", "name", "location", "address", "isOnline", "lastSeen", "createdAt"]
+      },
+      {
+        "name": "sensor_readings",
+        "indexes": ["sensorId", "timestamp"],
+        "ttl": "30 days",
+        "fields": ["_id", "sensorId", "timestamp", "aqi", "pollutants", "temperature", "humidity"]
+      },
+      {
+        "name": "sensor_predictions",
+        "fields": ["_id", "sensorId", "generatedAt", "hourlyPredictions", "dailyPredictions", "nlpSummary"]
+      },
+      {
+        "name": "alerts",
+        "indexes": ["userId", "createdAt"],
+        "fields": ["_id", "userId", "type", "severity", "title", "message", "sensorId", "aqiValue", "isRead", "createdAt"]
+      },
+      {
+        "name": "chat_conversations",
+        "indexes": ["userId"],
+        "fields": ["_id", "userId", "messages", "createdAt", "updatedAt"]
+      }
+    ]
+  },
+  "ml_nlp_requirements": {
+    "technology": "Python with FastAPI",
+    "ml_models": [
+      {
+        "name": "AQI Prediction",
+        "algorithm": "XGBoost",
+        "purpose": "24-hour and 7-day AQI forecasts",
+        "inputs": ["Historical AQI", "Weather data", "Time features"],
+        "outputs": ["Hourly predictions", "Daily predictions", "Confidence scores"]
+      },
+      {
+        "name": "Time Series Forecasting",
+        "algorithm": "Keras LSTM",
+        "purpose": "Long-term trend analysis",
+        "inputs": ["Historical sensor data", "Seasonal patterns"],
+        "outputs": ["Future AQI trends"]
+      }
+    ],
+    "nlp_models": [
+      {
+        "name": "Chatbot",
+        "framework": "HuggingFace Transformers",
+        "model": "DistilBERT",
+        "purpose": "Answer user queries about air quality",
+        "capabilities": ["Health queries", "AQI explanations", "Recommendations", "Historical analysis"]
+      },
+      {
+        "name": "Forecast Summary Generator",
+        "purpose": "Generate natural language summaries of forecasts",
+        "inputs": ["Forecast data", "Weather conditions"],
+        "outputs": ["Human-readable summary"]
+      }
+    ],
+    "preprocessing": "scikit-learn"
+  },
+  "deployment": {
+    "ci_cd": "GitHub Actions",
+    "environments": ["development", "staging", "production"],
+    "app_stores": ["Google Play Store", "Apple App Store"],
+    "monitoring": ["Firebase Crashlytics", "Firebase Analytics"],
+    "version_control": "Git"
+  },
+  "timeline": {
+    "week_1": {
+      "phase": "Foundation",
+      "deliverables": ["Project setup", "Auth screens", "Profile form", "Basic navigation"]
+    },
+    "week_2": {
+      "phase": "Core Features",
+      "deliverables": ["Dashboard UI", "Map integration", "Sensor API integration"]
+    },
+    "week_3": {
+      "phase": "Advanced Features",
+      "deliverables": ["Forecast charts", "Chat interface", "Push notifications"]
+    },
+    "week_4": {
+      "phase": "Polish & Launch",
+      "deliverables": ["Testing", "Bug fixes", "Performance optimization", "App store submission"]
+    }
+  },
+  "kpis": {
+    "daily_active_users": ">500",
+    "alert_open_rate": ">70%",
+    "average_session_duration": ">3 minutes",
+    "app_store_rating": ">=4.5 stars",
+    "crash_free_sessions": ">99.5%"
+  },
+  "accessibility": {
+    "wcag_level": "AA",
+    "requirements": [
+      "Minimum contrast ratio 4.5:1",
+      "Screen reader support",
+      "Dynamic font scaling",
+      "Touch targets ≥48dp",
+      "Color-blind friendly indicators",
+      "Keyboard navigation support"
+    ]
+  },
+  "future_enhancements": [
+    "Apple Watch / Wear OS companion app",
+    "Air purifier device integration",
+    "Social features (share air quality)",
+    "Gamification (health points, badges)",
+    "Indoor air quality sensors",
+    "Multi-language support (10+ languages)",
+    "Enterprise API for B2B clients"
+  ]
+}
