@@ -6,13 +6,20 @@ import 'package:air_quality_guardian/presentation/providers/dashboard_provider.d
 import 'package:air_quality_guardian/presentation/providers/auth_provider.dart';
 
 class AirQualityGuardianApp extends StatelessWidget {
-  const AirQualityGuardianApp({super.key});
+  final AuthProvider? initialAuthProvider;
+
+  const AirQualityGuardianApp({
+    super.key, 
+    this.initialAuthProvider,
+  });
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
+        ChangeNotifierProvider(
+          create: (_) => initialAuthProvider ?? (AuthProvider()..initialize()),
+        ),
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
       ],
       child: MaterialApp(

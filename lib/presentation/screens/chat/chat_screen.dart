@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'dart:async';
 
 class ChatMessage {
   final String id;
@@ -263,6 +265,21 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  final Dio _dio = Dio();
+  Map<String, dynamic>? _latestSensorData;
+
+  Future<void> _fetchSensorData() async {
+    try {
+      // connecting to localhost (change to 10.0.2.2 for Android Emulator)
+      final response = await _dio.get('http://localhost:5000/api/data');
+      if (response.statusCode == 200) {
+        _latestSensorData = response.data;
+      }
+    } catch (e) {
+      debugPrint('Error fetching sensor data: $e');
+    }
+  }
+
   void _sendMessage() {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -283,21 +300,33 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
     _scrollToBottom();
 
-    // Simulate AI response
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() {
-        _isTyping = false;
-        _messages.add(
-          ChatMessage(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            text: _generateResponse(text),
-            isUser: false,
-            timestamp: DateTime.now(),
-          ),
-        );
-      });
-      _scrollToBottom();
+    // Get AI response
+    _getAIResponse(text);
+  }
+
+  Future<void> _getAIResponse(String query) async {
+    // Fetch latest data before responding
+    await _fetchSensorData();
+
+    // Simulate thinking delay for better UX
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (!mounted) return;
+
+    String responseText = _generateResponse(query);
+
+    setState(() {
+      _isTyping = false;
+      _messages.add(
+        ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          text: responseText,
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
     });
+    _scrollToBottom();
   }
 
   void _sendQuickReply(String text) {
@@ -308,17 +337,138 @@ class _ChatScreenState extends State<ChatScreen> {
   String _generateResponse(String query) {
     final lowerQuery = query.toLowerCase();
     
-    if (lowerQuery.contains('aqi') || lowerQuery.contains('air quality index')) {
-      return 'AQI (Air Quality Index) is a number from 0-500 that indicates how polluted the air is. Higher values mean worse air quality:\n\n• 0-50: Good ✅\n• 51-100: Moderate ⚠️\n• 101-150: Unhealthy for Sensitive Groups 🟠\n• 151-200: Unhealthy 🔴\n• 201-300: Very Unhealthy 🟣\n• 301+: Hazardous ⚫';
-    } else if (lowerQuery.contains('safe') || lowerQuery.contains('outside')) {
-      return 'Based on the current AQI of 156 (Unhealthy), I recommend:\n\n• Limit prolonged outdoor activities\n• Wear an N95 mask if going outside\n• Keep windows closed\n• Use an air purifier indoors\n• Monitor your symptoms\n\nSensitive groups should avoid outdoor activities.';
-    } else if (lowerQuery.contains('health') || lowerQuery.contains('tip')) {
-      return 'Here are some health tips for current air quality:\n\n1. Stay indoors as much as possible\n2. Use HEPA air purifiers\n3. Keep windows and doors closed\n4. Avoid strenuous outdoor activities\n5. Stay hydrated\n6. Monitor your symptoms\n7. Keep your inhaler handy (if you have asthma)';
-    } else if (lowerQuery.contains('pollutant')) {
-      return 'Current major pollutants:\n\n• PM2.5: 85 µg/m³ (High)\n• PM10: 120 µg/m³ (High)\n• O3: 45 ppb (Moderate)\n• NO2: 38 ppb (Good)\n• SO2: 12 ppb (Good)\n• CO: 2.5 ppm (Good)\n\nPM2.5 and PM10 are the main concerns right now.';
-    } else {
-      return 'I understand you\'re asking about "$query". I can help you with air quality information, health recommendations, and pollutant data. Could you please rephrase your question or ask about:\n\n• Current AQI levels\n• Health recommendations\n• Pollutant information\n• Safety guidelines';
+    // Formatting helper
+    String getVal(String key) {
+        if (_latestSensorData == null || !_latestSensorData!.containsKey(key)) return 'N/A';
+        return _latestSensorData![key].toString();
     }
+
+    if (lowerQuery.contains('aqi') || lowerQuery.contains('air quality index')) {
+      final aqi = getVal('aqi'); // Assuming 'aqi' is in the payload or we calculate it. 
+      // If direct AQI isn't available, we might construct it or fallback. 
+      // For now, let's assume raw values are what we show or we show a generic message if missing.
+      return 'Current Air Quality Data:\nAQI: $aqi\n\n(Note: 0-50 Good, 51-100 Moderate, >100 Unhealthy)';
+    } else if (lowerQuery.contains('safe') || lowerQuery.contains('outside')) {
+       final pm25 = double.tryParse(getVal('pm2_5')) ?? 0;
+       String safetyMsg = pm25 > 35 ? 'Unhealthy 🔴. Stay indoors.' : 'Safe ✅. Enjoy the outdoors!';
+       return 'Safety Assessment based on PM2.5 ($pm25 µg/m³):\n$safetyMsg';
+    } else if (lowerQuery.contains('health') || lowerQuery.contains('tip')) {
+      return 'Real-time Health Tips:\n• Monitor PM2.5 (${getVal('pm2_5')} µg/m³)\n• Monitor CO2 (${getVal('co2')} ppm)\n\nIf levels are high, use an air purifier and ensure proper ventilation.';
+    } else if (lowerQuery.contains('pollutant')) {
+      return 'Real-time Pollutants:\n\n• PM2.5: ${getVal('pm2_5')} µg/m³\n• PM10: ${getVal('pm10')} µg/m³\n• CO2: ${getVal('co2')} ppm\n• TVOC: ${getVal('tvoc')} ppb\n• Humidity: ${getVal('humidity')} %\n• Temperature: ${getVal('temperature')} °C';
+    } else if (lowerQuery.contains('forecast') || lowerQuery.contains('predict') || lowerQuery.contains('tomorrow')) {
+      // Fetch forecast from API
+      _fetchForecast(lowerQuery);
+      return '📊 Fetching forecast data...';
+    } else {
+      return 'I can help you with:\n• Current air quality (ask "AQI" or "pollutants")\n• Safety assessment (ask "is it safe?")\n• Health tips\n• Forecasts (ask "forecast" or "tomorrow")\n\n(Data Source: Live MQTT + ML Predictions)';
+    }
+  }
+
+  Future<void> _fetchForecast(String query) async {
+    try {
+      String endpoint = 'http://localhost:5000/api/predict';
+      
+      // Determine which forecast to fetch
+      if (query.contains('24') || query.contains('hour') || query.contains('tomorrow')) {
+        endpoint = 'http://localhost:5000/api/forecast/24h';
+      } else if (query.contains('week') || query.contains('7 day')) {
+        endpoint = 'http://localhost:5000/api/forecast/week';
+      }
+      
+      final response = await _dio.get(endpoint);
+      
+      if (response.statusCode == 200) {
+        String forecastText = _formatForecastResponse(response.data, endpoint);
+        
+        // Add forecast message to chat
+        if (mounted) {
+          setState(() {
+            _isTyping = false;
+            _messages.add(
+              ChatMessage(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                text: forecastText,
+                isUser: false,
+                timestamp: DateTime.now(),
+              ),
+            );
+          });
+          _scrollToBottom();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isTyping = false;
+          _messages.add(
+            ChatMessage(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              text: '⚠️ Forecast unavailable. Make sure:\n1. mqtt_pipeline.py is running\n2. ML models are trained (run train_model.py)',
+              isUser: false,
+              timestamp: DateTime.now(),
+            ),
+          );
+        });
+        _scrollToBottom();
+      }
+    }
+  }
+
+  String _formatForecastResponse(Map<String, dynamic> data, String endpoint) {
+    if (endpoint.contains('24h')) {
+      // Format 24-hour forecast
+      final forecast = data['forecast'] as List;
+      final first = forecast[0]['values'];
+      final mid = forecast[11]['values'];
+      final last = forecast[23]['values'];
+      
+      return '📊 24-Hour Forecast:\n\n'
+          'Next Hour:\n'
+          '• PM2.5: ${first['pm2_5']} µg/m³\n'
+          '• PM10: ${first['pm10']} µg/m³\n'
+          '• CO2: ${first['co2']} ppm\n\n'
+          'In 12 Hours:\n'
+          '• PM2.5: ${mid['pm2_5']} µg/m³\n'
+          '• PM10: ${mid['pm10']} µg/m³\n\n'
+          'In 24 Hours:\n'
+          '• PM2.5: ${last['pm2_5']} µg/m³\n'
+          '• PM10: ${last['pm10']} µg/m³\n\n'
+          '💡 Trend: ${_getTrend(first['pm2_5'], last['pm2_5'])}';
+    } else if (endpoint.contains('week')) {
+      // Format 7-day forecast
+      final forecast = data['forecast'] as List;
+      String weekText = '📅 7-Day Forecast:\n\n';
+      
+      for (var day in forecast.take(3)) {
+        final values = day['values'];
+        weekText += 'Day ${day['day']} (${day['date']}):\n'
+            '• PM2.5: ${values['pm2_5']} µg/m³\n'
+            '• PM10: ${values['pm10']} µg/m³\n\n';
+      }
+      
+      weekText += '💡 View full forecast in Forecast tab';
+      return weekText;
+    } else {
+      // Format single prediction
+      final pred = data['predictions'];
+      return '🔮 Next Hour Prediction:\n\n'
+          '• PM2.5: ${pred['pm2_5']} µg/m³\n'
+          '• PM10: ${pred['pm10']} µg/m³\n'
+          '• CO2: ${pred['co2']} ppm\n'
+          '• TVOC: ${pred['tvoc']} ppb\n'
+          '• Temperature: ${pred['temperature']} °C\n'
+          '• Humidity: ${pred['humidity']} %';
+    }
+  }
+
+  String _getTrend(dynamic start, dynamic end) {
+    final startVal = start is num ? start.toDouble() : double.tryParse(start.toString()) ?? 0;
+    final endVal = end is num ? end.toDouble() : double.tryParse(end.toString()) ?? 0;
+    
+    if (endVal < startVal * 0.9) return 'Improving ✅';
+    if (endVal > startVal * 1.1) return 'Worsening ⚠️';
+    return 'Stable ➡️';
   }
 
   void _clearChat() {

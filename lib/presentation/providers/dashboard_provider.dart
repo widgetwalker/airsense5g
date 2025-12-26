@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:air_quality_guardian/domain/entities/sensor.dart';
 import 'package:air_quality_guardian/core/utils/aqi_utils.dart';
+import 'package:dio/dio.dart';
 
 class DashboardProvider with ChangeNotifier {
   Sensor? _currentSensor;
@@ -63,24 +64,43 @@ class DashboardProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Implement actual API call
-      // For now, using mock data
-      await Future.delayed(const Duration(seconds: 1));
+      final dio = Dio();
+      // connecting to localhost (change to 10.0.2.2 for Android Emulator)
+      final response = await dio.get('http://localhost:5000/api/data');
+      
+      Map<String, dynamic> data = {};
+      if (response.statusCode == 200) {
+        data = response.data;
+      }
 
+      // Safe parsing helpers
+      double getDouble(String key) {
+        if (data[key] == null) return 0.0;
+        return double.tryParse(data[key].toString()) ?? 0.0;
+      }
+      
+      int getInt(String key) {
+         if (data[key] == null) return 0;
+         return int.tryParse(data[key].toString()) ?? 0;
+      }
+
+      // If data is empty (no connection yet), keep defaults or show empty
+      // But we will try to fill from API response
+      
       _currentSensor = Sensor(
         id: '1',
-        name: 'Downtown Area',
+        name: 'Sensor 3 (Live)',
         latitude: 28.6139,
         longitude: 77.2090,
-        address: 'Connaught Place, New Delhi',
-        currentAqi: 156,
-        pollutants: const {
-          'PM2.5': 85.0,
-          'PM10': 120.0,
-          'O3': 45.0,
-          'NO2': 38.0,
-          'SO2': 12.0,
-          'CO': 2.5,
+        address: 'Live MQTT Location',
+        currentAqi: getInt('aqi') > 0 ? getInt('aqi') : 0, // AQI from payload or calculate?
+        pollutants: {
+          'PM2.5': getDouble('pm2_5'),
+          'PM10': getDouble('pm10'),
+          'CO2': getDouble('co2'),
+          'TVOC': getDouble('tvoc'),
+          'Humidity': getDouble('humidity'),
+          'Temp': getDouble('temperature'),
         },
         lastUpdated: DateTime.now(),
         isOnline: true,

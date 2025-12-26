@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import 'package:air_quality_guardian/presentation/providers/dashboard_provider.dart';
 import 'package:air_quality_guardian/presentation/screens/dashboard/widgets/aqi_gauge.dart';
 import 'package:air_quality_guardian/presentation/screens/dashboard/widgets/risk_card.dart';
@@ -15,6 +16,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +30,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         4,
       );
     });
+
+    // Set up auto-refresh timer (every 30 seconds)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) {
+        context.read<DashboardProvider>().fetchDashboardData();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -190,32 +206,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             whoGuideline: AqiConstants.whoGuidelinePM10,
                           ),
                           PollutantBar(
-                            pollutantName: AqiConstants.pollutantO3,
+                            pollutantName: 'CO2',
                             value:
-                                provider.currentSensor!.pollutants['O3'] ?? 0,
-                            unit: 'ppb',
-                            whoGuideline: AqiConstants.whoGuidelineO3,
-                          ),
-                          PollutantBar(
-                            pollutantName: AqiConstants.pollutantNO2,
-                            value:
-                                provider.currentSensor!.pollutants['NO2'] ?? 0,
-                            unit: 'ppb',
-                            whoGuideline: AqiConstants.whoGuidelineNO2,
-                          ),
-                          PollutantBar(
-                            pollutantName: AqiConstants.pollutantSO2,
-                            value:
-                                provider.currentSensor!.pollutants['SO2'] ?? 0,
-                            unit: 'ppb',
-                            whoGuideline: AqiConstants.whoGuidelineSO2,
-                          ),
-                          PollutantBar(
-                            pollutantName: AqiConstants.pollutantCO,
-                            value:
-                                provider.currentSensor!.pollutants['CO'] ?? 0,
+                                provider.currentSensor!.pollutants['CO2'] ?? 0,
                             unit: 'ppm',
-                            whoGuideline: AqiConstants.whoGuidelineCO,
+                            whoGuideline: 1000.0, // Indoor CO2 guideline
+                          ),
+                          PollutantBar(
+                            pollutantName: 'TVOC',
+                            value:
+                                provider.currentSensor!.pollutants['TVOC'] ?? 0,
+                            unit: 'ppb',
+                            whoGuideline: 300.0, // General TVOC guideline
+                          ),
+                          PollutantBar(
+                            pollutantName: 'Humidity',
+                            value:
+                                provider.currentSensor!.pollutants['Humidity'] ?? 0,
+                            unit: '%',
+                            whoGuideline: 60.0, // Comfortable humidity range
+                          ),
+                          PollutantBar(
+                            pollutantName: 'Temperature',
+                            value:
+                                provider.currentSensor!.pollutants['Temp'] ?? 0,
+                            unit: '°C',
+                            whoGuideline: 25.0, // Comfortable temperature
                           ),
                         ],
                       ),

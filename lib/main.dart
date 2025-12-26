@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:air_quality_guardian/app/app.dart';
 import 'package:air_quality_guardian/core/di/service_locator.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:air_quality_guardian/presentation/providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,8 +14,9 @@ void main() async {
   // Initialize dependency injection
   await setupServiceLocator();
 
-  // TODO: Initialize Firebase
-  // await Firebase.initializeApp();
+  // Initialize AuthProvider to ensure persistence
+  final authProvider = AuthProvider();
+  await authProvider.initialize();
 
-  runApp(const AirQualityGuardianApp());
+  runApp(AirQualityGuardianApp(initialAuthProvider: authProvider));
 }
